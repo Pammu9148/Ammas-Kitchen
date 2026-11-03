@@ -1,98 +1,67 @@
-import * as Device from 'expo-device';
-import { Platform, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
+import { useCallback, useEffect, useState } from 'react';
+import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useProfile } from '../profileContext';
+import { supabase } from '../supabase';
+import { colors } from '../theme';
 
-import { AnimatedIcon } from '@/components/animated-icon';
-import { HintRow } from '@/components/hint-row';
-import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { WebBadge } from '@/components/web-badge';
-import { BottomTabInset, MaxContentWidth, Spacing } from '@/constants/theme';
+export default function Home() {
+  const router = useRouter();
+  const { role, session } = useProfile();
+  const [cooks, setCooks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-function getDevMenuHint() {
-  if (Platform.OS === 'web') {
-    return <ThemedText type="small">use browser devtools</ThemedText>;
-  }
-  if (Device.isDevice) {
-    return (
-      <ThemedText type="small">
-        shake device or press <ThemedText type="code">m</ThemedText> in terminal
-      </ThemedText>
-    );
-  }
-  const shortcut = Platform.OS === 'android' ? 'cmd+m (or ctrl+m)' : 'cmd+d';
+  const load = useCallback(async () => {
+    setLoading(true);
+    const { data } = await supabase.from('cooks').select('*').order('created_at', { ascending: false });
+    setCooks(data ?? []);
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { if (role === 'cook') router.replace('/cook-home' as any); }, [role]);
+  useEffect(() => { if (session) load(); }, [session, load]);
+
   return (
-    <ThemedText type="small">
-      press <ThemedText type="code">{shortcut}</ThemedText>
-    </ThemedText>
-  );
-}
+    <View style={styles.container}>
+      <Pressable style={{ position: 'absolute', top: 55, right: 20, zIndex: 1 }} onPress={() => router.push('/profile' as any)}>
+        <Text style={{ fontSize: 28 }}>👤</Text>
+      </Pressable>
+      <Pressable style={{ position: 'absolute', top: 55, right: 64, zIndex: 1 }} onPress={() => router.push('/orders' as any)}>
+        <Text style={{ fontSize: 28 }}>🧾</Text>
+      </Pressable>
+      <Text style={styles.small}>Delivering to</Text>
+      <Text style={styles.location}>Belgaum, Karnataka</Text>
+      <Text style={styles.title}>Home food, made near you</Text>
 
-export default function HomeScreen() {
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView style={styles.safeArea}>
-        <ThemedView style={styles.heroSection}>
-          <AnimatedIcon />
-          <ThemedText type="title" style={styles.title}>
-            Welcome to&nbsp;Expo
-          </ThemedText>
-        </ThemedView>
-
-        <ThemedText type="code" style={styles.code}>
-          get started
-        </ThemedText>
-
-        <ThemedView type="backgroundElement" style={styles.stepContainer}>
-          <HintRow
-            title="Try editing"
-            hint={<ThemedText type="code">src/app/index.tsx</ThemedText>}
-          />
-          <HintRow title="Dev tools" hint={getDevMenuHint()} />
-          <HintRow
-            title="Fresh start"
-            hint={<ThemedText type="code">npm run reset-project</ThemedText>}
-          />
-        </ThemedView>
-
-        {Platform.OS === 'web' && <WebBadge />}
-      </SafeAreaView>
-    </ThemedView>
+      <FlatList
+        data={cooks}
+        keyExtractor={(c) => c.id}
+        refreshing={loading}
+        onRefresh={load}
+        ListEmptyComponent={!loading ? <Text style={styles.meta}>No home cooks have joined yet. Pull down to refresh.</Text> : null}
+        renderItem={({ item }) => (
+          <Pressable style={styles.card} onPress={() => router.push(`/cook/${item.id}` as any)}>
+            <Text style={styles.emoji}>👩‍🍳</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.name}>{item.name}</Text>
+              <Text style={styles.meta}>{item.speciality}</Text>
+              <Text style={styles.meta}>📍 {item.area}</Text>
+            </View>
+            <Text style={{ color: item.is_open ? 'green' : 'red' }}>{item.is_open ? 'Open' : 'Closed'}</Text>
+          </Pressable>
+        )}
+      />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    flexDirection: 'row',
-  },
-  safeArea: {
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    alignItems: 'center',
-    gap: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
-    maxWidth: MaxContentWidth,
-  },
-  heroSection: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
-    paddingHorizontal: Spacing.four,
-    gap: Spacing.four,
-  },
-  title: {
-    textAlign: 'center',
-  },
-  code: {
-    textTransform: 'uppercase',
-  },
-  stepContainer: {
-    gap: Spacing.three,
-    alignSelf: 'stretch',
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.four,
-    borderRadius: Spacing.four,
-  },
+  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 60 },
+  small: { color: colors.muted, fontSize: 12 },
+  location: { color: colors.text, fontSize: 16, fontWeight: '600' },
+  title: { color: colors.text, fontSize: 26, fontWeight: '800', marginVertical: 20 },
+  card: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.card, padding: 16, borderRadius: 16, marginBottom: 12 },
+  emoji: { fontSize: 36 },
+  name: { color: colors.text, fontSize: 16, fontWeight: '700' },
+  meta: { color: colors.muted, marginTop: 3 },
 });
