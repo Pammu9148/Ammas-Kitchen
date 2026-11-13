@@ -25,6 +25,7 @@ function Gate() {
       <Stack.Screen name="cook-home" options={{ headerShown: false }} />
       <Stack.Screen name="orders" options={{ title: 'My Orders' }} />
       <Stack.Screen name="cook-orders" options={{ title: 'Orders' }} />
+      <Stack.Screen name="rate" options={{ title: 'Rate your meal' }} />
     </Stack>
   );
 }

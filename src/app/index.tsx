@@ -11,10 +11,12 @@ export default function Home() {
   const [cooks, setCooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const load = useCallback(async () => {
+    const load = useCallback(async () => {
     setLoading(true);
     const { data } = await supabase.from('cooks').select('*').order('created_at', { ascending: false });
-    setCooks(data ?? []);
+    const { data: r } = await supabase.from('cook_ratings').select('*');
+    const map = new Map((r ?? []).map((x: any) => [x.cook_id, x]));
+    setCooks((data ?? []).map((c: any) => ({ ...c, rating: map.get(c.id) })));
     setLoading(false);
   }, []);
 
@@ -31,14 +33,18 @@ export default function Home() {
       </Pressable>
       <Text style={styles.small}>Delivering to</Text>
       <Text style={styles.location}>Belgaum, Karnataka</Text>
-      <Text style={styles.title}>Home food, made near you</Text>
+      <Text style={styles.title}>Home food, made with love</Text>
 
       <FlatList
         data={cooks}
         keyExtractor={(c) => c.id}
         refreshing={loading}
         onRefresh={load}
-        ListEmptyComponent={!loading ? <Text style={styles.meta}>No home cooks have joined yet. Pull down to refresh.</Text> : null}
+              ListEmptyComponent={() =>
+          loading ? null : (
+            <Text style={styles.meta}>No home cooks have joined yet. Pull down to refresh.</Text>
+          )
+        }
         renderItem={({ item }) => (
           <Pressable style={styles.card} onPress={() => router.push(`/cook/${item.id}` as any)}>
             <Text style={styles.emoji}>👩‍🍳</Text>
@@ -46,6 +52,7 @@ export default function Home() {
               <Text style={styles.name}>{item.name}</Text>
               <Text style={styles.meta}>{item.speciality}</Text>
               <Text style={styles.meta}>📍 {item.area}</Text>
+              <Text style={styles.meta}>{item.rating ? `⭐ ${item.rating.avg_rating} (${item.rating.review_count})` : '⭐ New'}</Text>
             </View>
             <Text style={{ color: item.is_open ? 'green' : 'red' }}>{item.is_open ? 'Open' : 'Closed'}</Text>
           </Pressable>
