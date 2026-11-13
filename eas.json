@@ -12,6 +12,9 @@
     "preview": {
       "distribution": "internal",
       "channel": "preview",
+      "env": {
+    "EAS_BUILD_DISABLE_EXPO_DOCTOR_STEP": "true"
+  },
       "android": {
         "buildType": "apk"
       },
