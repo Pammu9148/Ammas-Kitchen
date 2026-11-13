@@ -38,6 +38,13 @@ export default function CookOrders() {
     load();
   };
 
+  const today = new Date().toDateString();
+  const delivered = orders.filter((o) => o.status === 'delivered');
+  const todays = delivered.filter((o) => new Date(o.created_at).toDateString() === today);
+  const earnedToday = todays.reduce((s, o) => s + o.total, 0);
+  const earnedTotal = delivered.reduce((s, o) => s + o.total, 0);
+  const pending = orders.filter((o) => o.status === 'placed').length;
+
   return (
     <FlatList
       style={styles.container}
@@ -45,6 +52,16 @@ export default function CookOrders() {
       keyExtractor={(o) => o.id}
       onRefresh={load}
       refreshing={false}
+      ListHeaderComponent={
+        <View style={{ marginBottom: 12 }}>
+          <View style={styles.summary}>
+            <View style={styles.sumBox}><Text style={styles.sumNum}>{todays.length}</Text><Text style={styles.sumLabel}>Delivered today</Text></View>
+            <View style={styles.sumBox}><Text style={styles.sumNum}>₹{earnedToday}</Text><Text style={styles.sumLabel}>Earned today</Text></View>
+            <View style={styles.sumBox}><Text style={styles.sumNum}>₹{earnedTotal}</Text><Text style={styles.sumLabel}>Total earned</Text></View>
+          </View>
+          {pending > 0 && <Text style={styles.pending}>🔔 {pending} new order(s) waiting for you</Text>}
+        </View>
+      }
       ListEmptyComponent={<Text style={styles.muted}>No orders yet.</Text>}
       renderItem={({ item }) => (
         <View style={styles.card}>
@@ -70,6 +87,11 @@ export default function CookOrders() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 16 },
+  summary: { flexDirection: 'row', gap: 8 },
+  sumBox: { flex: 1, backgroundColor: colors.card, padding: 12, borderRadius: 14, alignItems: 'center' },
+  sumNum: { fontSize: 20, fontWeight: '800', color: colors.primary },
+  sumLabel: { fontSize: 11, color: colors.muted, marginTop: 4, textAlign: 'center' },
+  pending: { marginTop: 12, color: colors.text, fontWeight: '700' },
   card: { backgroundColor: colors.card, padding: 16, borderRadius: 14, marginBottom: 12 },
   name: { fontSize: 16, fontWeight: '700', color: colors.text },
   muted: { color: colors.muted, marginTop: 4 },

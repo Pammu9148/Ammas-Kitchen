@@ -11,6 +11,7 @@ export default function CookProfile() {
   const { items, add, remove, count, total } = useCart();
   const [cook, setCook] = useState<any>(null);
   const [menu, setMenu] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
@@ -18,6 +19,8 @@ export default function CookProfile() {
       setCook(c);
       const { data: m } = await supabase.from('menu_items').select('*').eq('cook_id', id).order('created_at');
       setMenu(m ?? []);
+      const { data: rv } = await supabase.from('reviews').select('*').eq('cook_id', id).order('created_at', { ascending: false }).limit(5);
+      setReviews(rv ?? []);
     })();
   }, [id]);
 
@@ -55,6 +58,16 @@ export default function CookProfile() {
             </View>
             );
         })}
+        <Text style={styles.section}>Student Reviews</Text>
+        {reviews.length === 0 && <Text style={styles.meta}>No reviews yet.</Text>}
+        {reviews.map((r) => (
+          <View key={r.id} style={styles.item}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.itemName}>{'⭐'.repeat(r.rating)} · {r.customer_name}</Text>
+              {!!r.comment && <Text style={styles.meta}>{r.comment}</Text>}
+            </View>
+          </View>
+        ))}
       </ScrollView>
 
       {count > 0 && (
