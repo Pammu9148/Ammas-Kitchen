@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useProfile } from '../profileContext';
 import { supabase } from '../supabase';
 import { colors } from '../theme';
@@ -7,6 +7,7 @@ import { colors } from '../theme';
 const labels: Record<string, string> = {
   placed: '⏳ Waiting for cook', accepted: '✅ Accepted', preparing: '🍳 Preparing',
   ready: '🛵 Ready / on the way', delivered: '🎉 Delivered', rejected: '❌ Rejected',
+  cancelled: '🚫 Cancelled',
 };
 
 export default function Orders() {
@@ -30,6 +31,11 @@ export default function Orders() {
     return () => { supabase.removeChannel(ch); };
   }, [load]);
 
+  const cancel = async (id: string) => {
+    const { error } = await supabase.rpc('cancel_order', { p_order_id: id });
+    if (error) Alert.alert('Could not cancel', error.message);
+    load();
+  };
   return (
     <FlatList
       style={styles.container}
@@ -46,6 +52,11 @@ export default function Orders() {
             <Text key={i.id} style={styles.muted}>{i.qty} × {i.name}</Text>
           ))}
           <Text style={styles.total}>₹{item.total} · Cash on delivery</Text>
+          {item.status === 'placed' && (
+            <Pressable onPress={() => cancel(item.id)}>
+              <Text style={{ color: 'red', fontWeight: '700', marginTop: 10 }}>Cancel order</Text>
+            </Pressable>
+          )}
         </View>
       )}
     />

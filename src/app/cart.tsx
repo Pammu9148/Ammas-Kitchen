@@ -12,26 +12,18 @@ export default function Cart() {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
-  const place = async () => {
+    const place = async () => {
     if (!cookId || !session) {
       Alert.alert('Cart problem', 'Please remove the items and add them again from the cook\'s page.');
       return;
     }
     setBusy(true);
-    const address = `${profile.pg}${profile.room ? `, Room ${profile.room}` : ''}`;
-    const { data: order, error } = await supabase.from('orders').insert({
-      customer_id: session.user.id, cook_id: cookId, total,
-      customer_name: profile.name, customer_phone: profile.phone, address,
-    }).select().single();
-    if (error || !order) {
-      setBusy(false);
-      return Alert.alert('Could not place order', error?.message ?? 'Try again');
-    }
-    const { error: e2 } = await supabase.from('order_items').insert(
-      items.map((i) => ({ order_id: order.id, name: i.name, price: i.price, qty: i.qty }))
-    );
+    const { error } = await supabase.rpc('place_order', {
+      p_cook_id: cookId,
+      p_items: items.map((i) => ({ name: i.name, qty: i.qty })),
+    });
     setBusy(false);
-    if (e2) return Alert.alert('Could not save items', e2.message);
+    if (error) return Alert.alert('Could not place order', error.message);
     clear();
     router.replace('/orders' as any);
   };
