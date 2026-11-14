@@ -5,14 +5,17 @@ import { useCart } from '../cartContext';
 import { useProfile } from '../profileContext';
 import { supabase } from '../supabase';
 import { colors } from '../theme';
+import { useOrdering } from '../useOrdering';
 
 export default function Cart() {
   const { items, cookId, add, remove, clear, total } = useCart();
   const { profile, complete, session } = useProfile();
   const router = useRouter();
+  const ordering = useOrdering();
+  const closed = ordering ? !ordering.open : false;
   const [busy, setBusy] = useState(false);
 
-    const place = async () => {
+  const place = async () => {
     if (!cookId || !session) {
       Alert.alert('Cart problem', 'Please remove the items and add them again from the cook\'s page.');
       return;
@@ -59,8 +62,21 @@ export default function Cart() {
               <Text style={styles.link}>{complete ? 'Change' : 'Add details'}</Text>
             </Pressable>
           </View>
-          <Pressable style={[styles.order, (!complete || busy) && { opacity: 0.4 }]} disabled={!complete || busy} onPress={place}>
-            <Text style={styles.orderText}>{busy ? 'Placing...' : 'Place Order'}</Text>
+
+          {closed && (
+            <Text style={styles.closedText}>
+              Orders are closed right now. {ordering?.text}
+            </Text>
+          )}
+
+          <Pressable
+            style={[styles.order, (!complete || busy || closed) && { opacity: 0.4 }]}
+            disabled={!complete || busy || closed}
+            onPress={place}
+          >
+            <Text style={styles.orderText}>
+              {busy ? 'Placing...' : closed ? 'Orders closed' : 'Place Order'}
+            </Text>
           </Pressable>
         </>
       )}
@@ -82,6 +98,7 @@ const styles = StyleSheet.create({
   label: { color: colors.muted, fontSize: 12 },
   addr: { color: colors.text, marginTop: 6, fontSize: 15 },
   link: { color: colors.primary, fontWeight: '800', marginTop: 8 },
+  closedText: { color: 'red', marginTop: 14, fontWeight: '700' },
   order: { backgroundColor: colors.primary, padding: 18, borderRadius: 16, marginTop: 20 },
   orderText: { color: '#fff', textAlign: 'center', fontWeight: '800', fontSize: 16 },
 });

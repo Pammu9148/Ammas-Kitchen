@@ -7,7 +7,7 @@ import { colors } from '../theme';
 
 const labels: Record<string, string> = {
   placed: '⏳ Waiting for cook', accepted: '✅ Accepted', preparing: '🍳 Preparing',
-  ready: '🛵 Ready / on the way', delivered: '🎉 Delivered', rejected: '❌ Rejected',
+  ready: '🍽️ Ready, waiting for pickup', picked_up: '🛵 On the way',
   cancelled: '🚫 Cancelled',
 };
 

@@ -16,6 +16,7 @@ export default function CookHome() {
   const [kitchen, setKitchen] = useState({ name: '', area: '', speciality: '' });
   const [isOpen, setIsOpen] = useState(true);
   const [saved, setSaved] = useState(false);
+  const [approved, setApproved] = useState(true);
   const [items, setItems] = useState<Item[]>([]);
   const [iName, setIName] = useState('');
   const [iPrice, setIPrice] = useState('');
@@ -30,6 +31,7 @@ export default function CookHome() {
       setKitchen({ name: c.name, area: c.area ?? '', speciality: c.speciality ?? '' });
       setIsOpen(c.is_open);
       setSaved(true);
+      setApproved(!!c.approved);
     }
     const { data: m } = await supabase.from('menu_items').select('*').eq('cook_id', uid).order('created_at');
     setItems(m ?? []);
@@ -41,7 +43,7 @@ export default function CookHome() {
     if (!kitchen.name.trim()) return Alert.alert('Enter your kitchen name');
     const { error } = await supabase.from('cooks').upsert({ id: uid, ...kitchen, is_open: isOpen });
     if (error) Alert.alert('Could not save', error.message);
-    else { setSaved(true); Alert.alert('Saved'); }
+    else { setSaved(true); load(); Alert.alert('Saved'); }
   };
 
   const toggleOpen = async (v: boolean) => {
@@ -88,6 +90,13 @@ export default function CookHome() {
   return (
     <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
       <Text style={styles.title}>My Kitchen 👩‍🍳</Text>
+
+      {saved && !approved && (
+        <Text style={styles.waiting}>
+          ⏳ Waiting for admin approval. Students can't see your kitchen yet.
+        </Text>
+      )}
+
       <Pressable style={styles.btn} onPress={() => router.push('/cook-orders' as any)}>
         <Text style={styles.btnText}>📋 View Orders</Text>
       </Pressable>
@@ -140,6 +149,7 @@ export default function CookHome() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 60 },
   title: { fontSize: 26, fontWeight: '800', color: colors.text, marginBottom: 10 },
+  waiting: { color: 'orange', fontWeight: '700', marginBottom: 8 },
   label: { color: colors.muted, marginTop: 14, marginBottom: 6, fontSize: 13 },
   input: { backgroundColor: colors.card, borderRadius: 12, padding: 14, fontSize: 16, color: colors.text, marginBottom: 4 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },

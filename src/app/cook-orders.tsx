@@ -8,7 +8,6 @@ const next: Record<string, { label: string; to: string }[]> = {
   placed: [{ label: 'Accept', to: 'accepted' }, { label: 'Reject', to: 'rejected' }],
   accepted: [{ label: 'Start Preparing', to: 'preparing' }],
   preparing: [{ label: 'Food Ready', to: 'ready' }],
-  ready: [{ label: 'Mark Delivered', to: 'delivered' }],
 };
 
 export default function CookOrders() {
