@@ -1,11 +1,13 @@
+import { decode } from 'base64-arraybuffer';
+import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import { useProfile } from '../profileContext';
 import { supabase } from '../supabase';
 import { colors } from '../theme';
 
-type Item = { id: string; name: string; price: number; veg: boolean };
+type Item = { id: string; name: string; price: number; veg: boolean; photo_url?: string | null };
 
 export default function CookHome() {
   const router = useRouter();
@@ -18,6 +20,8 @@ export default function CookHome() {
   const [iName, setIName] = useState('');
   const [iPrice, setIPrice] = useState('');
   const [iVeg, setIVeg] = useState(true);
+  const [photo, setPhoto] = useState<string | null>(null);
+  const [photoB64, setPhotoB64] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -45,13 +49,35 @@ export default function CookHome() {
     if (saved) await supabase.from('cooks').update({ is_open: v }).eq('id', uid);
   };
 
+  const pickPhoto = async () => {
+    const res = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'], quality: 0.5, allowsEditing: true, aspect: [4, 3], base64: true,
+    });
+    if (!res.canceled) {
+      setPhoto(res.assets[0].uri);
+      setPhotoB64(res.assets[0].base64 ?? null);
+    }
+  };
+
   const addItem = async () => {
     const price = parseInt(iPrice, 10);
     if (!saved) return Alert.alert('Save your kitchen details first');
     if (!iName.trim() || !price) return Alert.alert('Enter item name and price');
-    const { error } = await supabase.from('menu_items').insert({ cook_id: uid, name: iName.trim(), price, veg: iVeg });
+
+    let photo_url: string | null = null;
+    if (photo) {
+      if (!photoB64) return Alert.alert('Photo problem', 'Please choose the photo again.');
+      const path = `${uid}/${Date.now()}.jpg`;
+      const { error: upErr } = await supabase.storage
+        .from('dish-photos')
+        .upload(path, decode(photoB64), { contentType: 'image/jpeg' });
+      if (upErr) return Alert.alert('Photo upload failed', upErr.message);
+      photo_url = supabase.storage.from('dish-photos').getPublicUrl(path).data.publicUrl;
+    }
+
+    const { error } = await supabase.from('menu_items').insert({ cook_id: uid, name: iName.trim(), price, veg: iVeg, photo_url });
     if (error) return Alert.alert('Could not add', error.message);
-    setIName(''); setIPrice(''); load();
+    setIName(''); setIPrice(''); setPhoto(null); setPhotoB64(null); load();
   };
 
   const del = async (id: string) => {
@@ -84,6 +110,7 @@ export default function CookHome() {
       {items.length === 0 && <Text style={{ color: colors.muted }}>No items yet. Add your first dish below.</Text>}
       {items.map((m) => (
         <View key={m.id} style={styles.item}>
+          {m.photo_url ? <Image source={{ uri: m.photo_url }} style={styles.thumb} /> : null}
           <Text style={{ flex: 1, color: colors.text }}>{m.veg ? '🟢' : '🔴'} {m.name}</Text>
           <Text style={styles.price}>₹{m.price}</Text>
           <Pressable onPress={() => del(m.id)}><Text style={{ fontSize: 18, marginLeft: 14 }}>🗑️</Text></Pressable>
@@ -93,6 +120,12 @@ export default function CookHome() {
       <Text style={styles.label}>Add a dish</Text>
       <TextInput style={styles.input} value={iName} onChangeText={setIName} placeholder="Dish name" />
       <TextInput style={styles.input} value={iPrice} onChangeText={setIPrice} keyboardType="number-pad" placeholder="Price in ₹" />
+
+      <Pressable onPress={pickPhoto} style={{ marginTop: 8 }}>
+        <Text style={{ color: colors.primary, fontWeight: '800' }}>{photo ? '📷 Change photo' : '📷 Add dish photo'}</Text>
+      </Pressable>
+      {photo && <Image source={{ uri: photo }} style={{ width: 120, height: 90, borderRadius: 10, marginTop: 8 }} />}
+
       <View style={styles.rowBetween}>
         <Text style={styles.label}>{iVeg ? '🟢 Veg' : '🔴 Non-veg'}</Text>
         <Switch value={iVeg} onValueChange={setIVeg} trackColor={{ true: 'green' }} />
@@ -114,6 +147,7 @@ const styles = StyleSheet.create({
   btnText: { color: '#fff', textAlign: 'center', fontWeight: '800', fontSize: 16 },
   section: { fontSize: 18, fontWeight: '700', marginTop: 30, marginBottom: 10, color: colors.text },
   item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, padding: 14, borderRadius: 12, marginBottom: 8 },
+  thumb: { width: 48, height: 48, borderRadius: 8, marginRight: 10 },
   price: { fontWeight: '700', color: colors.primary },
   logout: { color: 'red', textAlign: 'center', fontWeight: '700', marginTop: 30, marginBottom: 60 },
 });

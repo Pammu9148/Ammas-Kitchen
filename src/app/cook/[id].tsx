@@ -1,12 +1,13 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useCart } from '../../cartContext';
 import { supabase } from '../../supabase';
 import { colors } from '../../theme';
 
 export default function CookProfile() {
   const { id } = useLocalSearchParams();
+  const cookId = Array.isArray(id) ? id[0] : id;
   const router = useRouter();
   const { items, add, remove, count, total } = useCart();
   const [cook, setCook] = useState<any>(null);
@@ -14,15 +15,29 @@ export default function CookProfile() {
   const [reviews, setReviews] = useState<any[]>([]);
 
   useEffect(() => {
+    if (!cookId) return;
+
+    let active = true;
     (async () => {
-      const { data: c } = await supabase.from('cooks').select('*').eq('id', id).maybeSingle();
+      const { data: c } = await supabase.from('cooks').select('*').eq('id', cookId).maybeSingle();
+      const { data: m } = await supabase.from('menu_items').select('*').eq('cook_id', cookId).order('created_at');
+      const { data: rv } = await supabase
+        .from('reviews')
+        .select('*')
+        .eq('cook_id', cookId)
+        .order('created_at', { ascending: false })
+        .limit(5);
+
+      if (!active) return;
       setCook(c);
-      const { data: m } = await supabase.from('menu_items').select('*').eq('cook_id', id).order('created_at');
       setMenu(m ?? []);
-      const { data: rv } = await supabase.from('reviews').select('*').eq('cook_id', id).order('created_at', { ascending: false }).limit(5);
       setReviews(rv ?? []);
     })();
-  }, [id]);
+
+    return () => {
+      active = false;
+    };
+  }, [cookId]);
 
   if (!cook) return <Text style={{ padding: 20 }}>Loading...</Text>;
 
@@ -40,24 +55,34 @@ export default function CookProfile() {
           const qty = items.find((i) => i.name === m.name)?.qty ?? 0;
           return (
             <View key={m.id} style={styles.item}>
+              {m.photo_url ? <Image source={{ uri: m.photo_url }} style={styles.dishImg} /> : null}
               <View style={{ flex: 1 }}>
                 <Text style={styles.itemName}>{m.veg ? '🟢' : '🔴'} {m.name}</Text>
                 <Text style={styles.price}>₹{m.price}</Text>
               </View>
               {qty === 0 ? (
-                <Pressable style={[styles.addBtn, !cook.is_open && { opacity: 0.3 }]} disabled={!cook.is_open} onPress={() => add(m.name, m.price, cook.id)}> 
+                <Pressable
+                  style={[styles.addBtn, !cook.is_open && { opacity: 0.3 }]}
+                  disabled={!cook.is_open}
+                  onPress={() => add(m.name, m.price, cook.id)}
+                >
                   <Text style={styles.addText}>ADD</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.qtyBox}>
+                  <Pressable onPress={() => remove(m.name)}>
+                    <Text style={styles.qtyBtn}>−</Text>
                   </Pressable>
-                  ) : (
-                  <View style={styles.qtyBox}>
-                    <Pressable onPress={() => remove(m.name)}><Text style={styles.qtyBtn}>−</Text></Pressable>
-                    <Text style={styles.qty}>{qty}</Text>
-                    <Pressable onPress={() => add(m.name, m.price, cook.id)}><Text style={styles.qtyBtn}>+</Text></Pressable>
-                    </View>
-                  )}
+                  <Text style={styles.qty}>{qty}</Text>
+                  <Pressable onPress={() => add(m.name, m.price, cook.id)}>
+                    <Text style={styles.qtyBtn}>+</Text>
+                  </Pressable>
+                </View>
+              )}
             </View>
-            );
+          );
         })}
+
         <Text style={styles.section}>Student Reviews</Text>
         {reviews.length === 0 && <Text style={styles.meta}>No reviews yet.</Text>}
         {reviews.map((r) => (
@@ -88,6 +113,7 @@ const styles = StyleSheet.create({
   closed: { textAlign: 'center', color: 'red', fontWeight: '700', marginTop: 10 },
   section: { fontSize: 18, fontWeight: '700', marginTop: 28, marginBottom: 12, color: colors.text },
   item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, padding: 16, borderRadius: 14, marginBottom: 10 },
+  dishImg: { width: 64, height: 64, borderRadius: 10, marginRight: 12 },
   itemName: { fontSize: 15, color: colors.text },
   price: { fontWeight: '700', color: colors.primary, marginTop: 4 },
   addBtn: { borderWidth: 1.5, borderColor: colors.primary, borderRadius: 10, paddingVertical: 8, paddingHorizontal: 20 },
