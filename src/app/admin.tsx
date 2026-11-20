@@ -1,6 +1,7 @@
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../profileContext';
 import { supabase } from '../supabase';
 import { colors } from '../theme';
@@ -11,6 +12,7 @@ const COMMISSION = 0.1; // your commission: 10% (change this number anytime)
 export default function Admin() {
   const { signOut } = useProfile();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const ordering = useOrdering();
   const [orders, setOrders] = useState<any[]>([]);
   const [cooks, setCooks] = useState<any[]>([]);
@@ -71,7 +73,10 @@ export default function Admin() {
   ];
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={{ padding: 16, paddingTop: insets.top + 20, paddingBottom: insets.bottom + 120 }}
+    >
       <Text style={styles.title}>Admin Panel 🛠️</Text>
 
       <Pressable style={[styles.card, { alignItems: 'center' }]} onPress={() => router.push('/delivery' as any)}>
@@ -136,7 +141,7 @@ export default function Admin() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 16, paddingTop: 60 },
+  container: { flex: 1, backgroundColor: colors.background },
   title: { fontSize: 26, fontWeight: '800', color: colors.text, marginBottom: 14 },
   card: { backgroundColor: colors.card, padding: 14, borderRadius: 14, marginBottom: 10 },
   rowBetween: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
@@ -150,6 +155,6 @@ const styles = StyleSheet.create({
   statNum: { fontSize: 22, fontWeight: '800', color: colors.primary },
   statLabel: { fontSize: 12, color: colors.muted, marginTop: 4 },
   section: { fontSize: 18, fontWeight: '700', marginVertical: 12, color: colors.text },
-  refresh: { color: colors.primary, textAlign: 'center', fontWeight: '800', marginTop: 16 },
-  logout: { color: 'red', textAlign: 'center', fontWeight: '700', marginTop: 20, marginBottom: 60 },
+  refresh: { color: colors.primary, textAlign: 'center', fontWeight: '800', marginTop: 16, padding: 8 },
+  logout: { color: 'red', textAlign: 'center', fontWeight: '700', marginTop: 12, padding: 12 },
 });

@@ -1,8 +1,12 @@
 import { decode } from 'base64-arraybuffer';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  Alert, Image, Keyboard, KeyboardAvoidingView, LayoutChangeEvent, Pressable, ScrollView,
+  ScrollViewInstance, StyleSheet, Switch, Text, TextInput, View,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useProfile } from '../profileContext';
 import { supabase } from '../supabase';
 import { colors } from '../theme';
@@ -11,8 +15,11 @@ type Item = { id: string; name: string; price: number; veg: boolean; photo_url?:
 
 export default function CookHome() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { session, signOut } = useProfile();
   const uid = session?.user.id;
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
+  const ys = useRef<Record<string, number>>({});
   const [kitchen, setKitchen] = useState({ name: '', area: '', speciality: '' });
   const [isOpen, setIsOpen] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -23,6 +30,16 @@ export default function CookHome() {
   const [iVeg, setIVeg] = useState(true);
   const [photo, setPhoto] = useState<string | null>(null);
   const [photoB64, setPhotoB64] = useState<string | null>(null);
+
+  // keeps a tapped input visible above the keyboard
+  const reg = (key: string) => ({
+    onLayout: (e: LayoutChangeEvent) => { ys.current[key] = e.nativeEvent.layout.y; },
+    onFocus: () => {
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: Math.max((ys.current[key] ?? 0) - 140, 0), animated: true });
+      }, 250);
+    },
+  });
 
   const load = useCallback(async () => {
     if (!uid) return;
@@ -40,6 +57,7 @@ export default function CookHome() {
   useEffect(() => { load(); }, [load]);
 
   const saveKitchen = async () => {
+    Keyboard.dismiss();
     if (!kitchen.name.trim()) return Alert.alert('Enter your kitchen name');
     const { error } = await supabase.from('cooks').upsert({ id: uid, ...kitchen, is_open: isOpen });
     if (error) Alert.alert('Could not save', error.message);
@@ -52,6 +70,7 @@ export default function CookHome() {
   };
 
   const pickPhoto = async () => {
+    Keyboard.dismiss();
     const res = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'], quality: 0.5, allowsEditing: true, aspect: [4, 3], base64: true,
     });
@@ -62,6 +81,7 @@ export default function CookHome() {
   };
 
   const addItem = async () => {
+    Keyboard.dismiss();
     const price = parseInt(iPrice, 10);
     if (!saved) return Alert.alert('Save your kitchen details first');
     if (!iName.trim() || !price) return Alert.alert('Enter item name and price');
@@ -88,66 +108,74 @@ export default function CookHome() {
   };
 
   return (
-    <ScrollView style={styles.container} keyboardShouldPersistTaps="handled">
-      <Text style={styles.title}>My Kitchen 👩‍🍳</Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior="padding">
+      <ScrollView
+        ref={scrollRef}
+        style={{ flex: 1 }}
+        contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + 120 }]}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
+        <Text style={styles.title}>My Kitchen 👩‍🍳</Text>
 
-      {saved && !approved && (
-        <Text style={styles.waiting}>
-          ⏳ Waiting for admin approval. Students can't see your kitchen yet.
-        </Text>
-      )}
+        {saved && !approved && (
+          <Text style={styles.waiting}>
+            ⏳ Waiting for admin approval. Students can't see your kitchen yet.
+          </Text>
+        )}
 
-      <Pressable style={styles.btn} onPress={() => router.push('/cook-orders' as any)}>
-        <Text style={styles.btnText}>📋 View Orders</Text>
-      </Pressable>
+        <Pressable style={styles.btn} onPress={() => router.push('/cook-orders' as any)}>
+          <Text style={styles.btnText}>📋 View Orders</Text>
+        </Pressable>
 
-      <Text style={styles.label}>Kitchen name</Text>
-      <TextInput style={styles.input} value={kitchen.name} onChangeText={(v) => setKitchen({ ...kitchen, name: v })} placeholder="e.g. Lakshmi Aunty's Kitchen" />
-      <Text style={styles.label}>Your area</Text>
-      <TextInput style={styles.input} value={kitchen.area} onChangeText={(v) => setKitchen({ ...kitchen, area: v })} placeholder="e.g. Tilakwadi" />
-      <Text style={styles.label}>Speciality</Text>
-      <TextInput style={styles.input} value={kitchen.speciality} onChangeText={(v) => setKitchen({ ...kitchen, speciality: v })} placeholder="e.g. North Karnataka meals" />
+        <Text style={styles.label}>Kitchen name</Text>
+        <TextInput {...reg('kname')} style={styles.input} value={kitchen.name} onChangeText={(v) => setKitchen({ ...kitchen, name: v })} placeholder="e.g. Lakshmi Aunty's Kitchen" />
+        <Text style={styles.label}>Your area</Text>
+        <TextInput {...reg('karea')} style={styles.input} value={kitchen.area} onChangeText={(v) => setKitchen({ ...kitchen, area: v })} placeholder="e.g. Tilakwadi" />
+        <Text style={styles.label}>Speciality</Text>
+        <TextInput {...reg('kspec')} style={styles.input} value={kitchen.speciality} onChangeText={(v) => setKitchen({ ...kitchen, speciality: v })} placeholder="e.g. North Karnataka meals" />
 
-      <View style={styles.rowBetween}>
-        <Text style={styles.label}>Accepting orders today</Text>
-        <Switch value={isOpen} onValueChange={toggleOpen} trackColor={{ true: colors.primary }} />
-      </View>
-
-      <Pressable style={styles.btn} onPress={saveKitchen}><Text style={styles.btnText}>Save Kitchen Details</Text></Pressable>
-
-      <Text style={styles.section}>My Menu</Text>
-      {items.length === 0 && <Text style={{ color: colors.muted }}>No items yet. Add your first dish below.</Text>}
-      {items.map((m) => (
-        <View key={m.id} style={styles.item}>
-          {m.photo_url ? <Image source={{ uri: m.photo_url }} style={styles.thumb} /> : null}
-          <Text style={{ flex: 1, color: colors.text }}>{m.veg ? '🟢' : '🔴'} {m.name}</Text>
-          <Text style={styles.price}>₹{m.price}</Text>
-          <Pressable onPress={() => del(m.id)}><Text style={{ fontSize: 18, marginLeft: 14 }}>🗑️</Text></Pressable>
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>Accepting orders today</Text>
+          <Switch value={isOpen} onValueChange={toggleOpen} trackColor={{ true: colors.primary }} />
         </View>
-      ))}
 
-      <Text style={styles.label}>Add a dish</Text>
-      <TextInput style={styles.input} value={iName} onChangeText={setIName} placeholder="Dish name" />
-      <TextInput style={styles.input} value={iPrice} onChangeText={setIPrice} keyboardType="number-pad" placeholder="Price in ₹" />
+        <Pressable style={styles.btn} onPress={saveKitchen}><Text style={styles.btnText}>Save Kitchen Details</Text></Pressable>
 
-      <Pressable onPress={pickPhoto} style={{ marginTop: 8 }}>
-        <Text style={{ color: colors.primary, fontWeight: '800' }}>{photo ? '📷 Change photo' : '📷 Add dish photo'}</Text>
-      </Pressable>
-      {photo && <Image source={{ uri: photo }} style={{ width: 120, height: 90, borderRadius: 10, marginTop: 8 }} />}
+        <Text style={styles.section}>My Menu</Text>
+        {items.length === 0 && <Text style={{ color: colors.muted }}>No items yet. Add your first dish below.</Text>}
+        {items.map((m) => (
+          <View key={m.id} style={styles.item}>
+            {m.photo_url ? <Image source={{ uri: m.photo_url }} style={styles.thumb} /> : null}
+            <Text style={{ flex: 1, color: colors.text }}>{m.veg ? '🟢' : '🔴'} {m.name}</Text>
+            <Text style={styles.price}>₹{m.price}</Text>
+            <Pressable onPress={() => del(m.id)}><Text style={{ fontSize: 18, marginLeft: 14 }}>🗑️</Text></Pressable>
+          </View>
+        ))}
 
-      <View style={styles.rowBetween}>
-        <Text style={styles.label}>{iVeg ? '🟢 Veg' : '🔴 Non-veg'}</Text>
-        <Switch value={iVeg} onValueChange={setIVeg} trackColor={{ true: 'green' }} />
-      </View>
-      <Pressable style={styles.btn} onPress={addItem}><Text style={styles.btnText}>Add to Menu</Text></Pressable>
+        <Text style={styles.label}>Add a dish</Text>
+        <TextInput {...reg('dish')} style={styles.input} value={iName} onChangeText={setIName} placeholder="Dish name" returnKeyType="next" />
+        <TextInput {...reg('price')} style={styles.input} value={iPrice} onChangeText={setIPrice} keyboardType="number-pad" placeholder="Price in ₹" />
 
-      <Pressable onPress={signOut}><Text style={styles.logout}>Log Out</Text></Pressable>
-    </ScrollView>
+        <Pressable onPress={pickPhoto} style={{ marginTop: 8 }}>
+          <Text style={{ color: colors.primary, fontWeight: '800' }}>{photo ? '📷 Change photo' : '📷 Add dish photo'}</Text>
+        </Pressable>
+        {photo && <Image source={{ uri: photo }} style={{ width: 120, height: 90, borderRadius: 10, marginTop: 8 }} />}
+
+        <View style={styles.rowBetween}>
+          <Text style={styles.label}>{iVeg ? '🟢 Veg' : '🔴 Non-veg'}</Text>
+          <Switch value={iVeg} onValueChange={setIVeg} trackColor={{ true: 'green' }} />
+        </View>
+        <Pressable style={styles.btn} onPress={addItem}><Text style={styles.btnText}>Add to Menu</Text></Pressable>
+
+        <Pressable onPress={signOut}><Text style={styles.logout}>Log Out</Text></Pressable>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, padding: 20, paddingTop: 60 },
+  container: { padding: 20, paddingTop: 60 },
   title: { fontSize: 26, fontWeight: '800', color: colors.text, marginBottom: 10 },
   waiting: { color: 'orange', fontWeight: '700', marginBottom: 8 },
   label: { color: colors.muted, marginTop: 14, marginBottom: 6, fontSize: 13 },
@@ -159,5 +187,5 @@ const styles = StyleSheet.create({
   item: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.card, padding: 14, borderRadius: 12, marginBottom: 8 },
   thumb: { width: 48, height: 48, borderRadius: 8, marginRight: 10 },
   price: { fontWeight: '700', color: colors.primary },
-  logout: { color: 'red', textAlign: 'center', fontWeight: '700', marginTop: 30, marginBottom: 60 },
+  logout: { color: 'red', textAlign: 'center', fontWeight: '700', marginTop: 30, marginBottom: 20, padding: 12 },
 });
