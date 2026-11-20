@@ -12,19 +12,32 @@ export default function Home() {
   const { role, session } = useProfile();
   const [cooks, setCooks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.from('cooks').select('*').order('created_at', { ascending: false });
-    const { data: r } = await supabase.from('cook_ratings').select('*');
-    const map = new Map((r ?? []).map((x: any) => [x.cook_id, x]));
-    setCooks((data ?? []).map((c: any) => ({ ...c, rating: map.get(c.id) })));
-    setLoading(false);
+    setError('');
+    try {
+      const { data, error: e1 } = await supabase.from('cooks').select('*').order('created_at', { ascending: false });
+      if (e1) setError('Cooks problem: ' + e1.message);
+
+      const { data: r, error: e2 } = await supabase.from('cook_ratings').select('*');
+      if (e2) setError((prev) => prev + ' Ratings problem: ' + e2.message);
+
+      const map = new Map((r ?? []).map((x: any) => [x.cook_id, x]));
+      setCooks((data ?? []).map((c: any) => ({ ...c, rating: map.get(c.id) })));
+    } catch (e: any) {
+      setError('Network problem: ' + String(e?.message ?? e));
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { if (role === 'cook') router.replace('/cook-home' as any); }, [role]);
   useEffect(() => { if (role === 'admin') router.replace('/admin' as any); }, [role]);
   useEffect(() => { if (role === 'delivery') router.replace('/delivery' as any); }, [role]);
+  useEffect(() => { if (session) load(); }, [session, load]);
+
   return (
     <View style={styles.container}>
       <Pressable style={{ position: 'absolute', top: 55, right: 20, zIndex: 1 }} onPress={() => router.push('/profile' as any)}>
@@ -47,6 +60,8 @@ export default function Home() {
         </View>
       )}
 
+      {!!error && <Text style={styles.error}>{error}</Text>}
+     
       <FlatList
         data={cooks}
         keyExtractor={(c) => c.id}
@@ -54,7 +69,7 @@ export default function Home() {
         onRefresh={load}
         ListEmptyComponent={() =>
           loading ? null : (
-            <Text style={styles.meta}>No home cooks have joined yet. Pull down to refresh.</Text>
+            <Text style={styles.meta}>No home cooks are available yet. Pull down to refresh.</Text>
           )
         }
         renderItem={({ item }) => (
@@ -82,6 +97,8 @@ const styles = StyleSheet.create({
   location: { color: colors.text, fontSize: 16, fontWeight: '600' },
   title: { color: colors.text, fontSize: 26, fontWeight: '800', marginVertical: 20 },
   banner: { padding: 12, borderRadius: 12, marginBottom: 12 },
+  error: { color: 'red', fontWeight: '700', marginBottom: 6 },
+  debug: { color: colors.muted, fontSize: 11, marginBottom: 8 },
   card: { flexDirection: 'row', alignItems: 'center', gap: 14, backgroundColor: colors.card, padding: 16, borderRadius: 16, marginBottom: 12 },
   emoji: { fontSize: 36 },
   name: { color: colors.text, fontSize: 16, fontWeight: '700' },
